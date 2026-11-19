@@ -1,9 +1,9 @@
 // Zee, the Zero2Gig AI tutor. Runs on Vercel so the Groq key stays secret.
 // Needs GROQ_API_KEY (already set for the project reviewer).
-// Optional: GROQ_CHAT_MODEL to change the model.
+// Optional: GROQ_CHAT_MODEL to choose a model. If a model is retired, the next one in lib/groq.js is used.
 // Only signed-in learners can use it: the request must carry their Supabase session token.
 
-const MODEL = process.env.GROQ_CHAT_MODEL || process.env.GROQ_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
+const { chat, friendly, TEXT_MODELS } = require("../lib/groq");
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://lzhinqwkakccpmlbfmjp.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6aGlucXdrYWtjY3BtbGJmbWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUwNzU4MjcsImV4cCI6MjExMDY1MTgyN30.nIrPLXnlKzIlkmI3RJgxISOIZ5Qw2JtwpdmCj4P2Iq0";
 
@@ -65,23 +65,10 @@ module.exports = async (req, res) => {
   if (ctx) messages.push({ role: "system", content: `Context (information only):\n${ctx}` });
   messages.push(...history);
 
-  let r;
   try {
-    r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: MODEL, temperature: 0.5, max_completion_tokens: 600, messages })
-    });
+    const out = await chat({ messages, models: TEXT_MODELS, maxTokens: 1500, temperature: 0.5 });
+    return res.status(200).json({ reply: out.text });
   } catch (e) {
-    return res.status(502).json({ error: "Zee couldn’t be reached. Please try again in a moment." });
+    return res.status(e.status === 429 ? 429 : 502).json({ error: friendly(e, "Zee") });
   }
-  if (r.status === 429) return res.status(429).json({ error: "Zee is helping a lot of learners right now. Please try again in a minute." });
-  if (!r.ok) {
-    console.error("Groq error", r.status, await r.text());
-    return res.status(502).json({ error: "Zee had a problem answering. Please try again." });
-  }
-  const data = await r.json();
-  const reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
-  if (!reply.trim()) return res.status(502).json({ error: "Zee didn’t have an answer that time. Please ask again." });
-  return res.status(200).json({ reply: reply.trim() });
 };

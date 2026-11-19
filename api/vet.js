@@ -1,10 +1,10 @@
 // AI assignment reviewer for Vercel. Keeps the API key secret on the server.
 // Set ONE of these in Vercel: Project > Settings > Environment Variables.
-//   GROQ_API_KEY       uses Groq (optional GROQ_MODEL)
+//   GROQ_API_KEY       uses Groq (optional GROQ_MODEL for text, GROQ_VISION_MODEL for screenshots)
 //   ANTHROPIC_API_KEY  uses Claude (optional ANTHROPIC_MODEL)
 // If both are set, Groq is used.
 
-const GROQ_MODEL = process.env.GROQ_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
+const { chat, friendly, TEXT_MODELS, VISION_MODELS } = require("../lib/groq");
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 
 const SYSTEM = `You review assignments for beginners on a learning platform that teaches digital skills from zero.
@@ -39,7 +39,7 @@ async function fetchPage(url) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Zero2Gig-Reviewer" } });
+    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "SkillRoute-Reviewer" } });
     if (!r.ok) return `(The link returned status ${r.status}, so its content could not be read.)`;
     let text = await r.text();
     if ((r.headers.get("content-type") || "").includes("html")) {
@@ -105,25 +105,26 @@ module.exports = async (req, res) => {
   let text = "";
   try {
     if (groqKey) {
-      const userContent = [{ type: "text", text: promptText }];
-      if (isImage) userContent.push({ type: "image_url", image_url: { url: `data:${file.type};base64,${file.data}` } });
-      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${groqKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          temperature: 0.2,
-          max_completion_tokens: 1200,
-          response_format: { type: "json_object" },
-          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: userContent }]
-        })
-      });
-      if (!r.ok) {
-        console.error("Groq API error", r.status, await r.text());
-        return res.status(502).json({ error: `The AI reviewer returned an error (${r.status}). Check GROQ_API_KEY and GROQ_MODEL in Vercel.` });
+      const sys = { role: "system", content: SYSTEM };
+      let done = false;
+      if (isImage) {
+        // Try a model that can look at the screenshot first.
+        try {
+          const out = await chat({ models: VISION_MODELS, maxTokens: 2500, temperature: 0.2, messages: [sys, { role: "user", content: [{ type: "text", text: promptText }, { type: "image_url", image_url: { url: `data:${file.type};base64,${file.data}` } }] }] });
+          text = out.text; done = true;
+        } catch (e) {
+          if (e.status === 401 || e.status === 403 || e.status === 429) return res.status(502).json({ error: friendly(e, "The AI reviewer") });
+        }
       }
-      const data = await r.json();
-      text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+      if (!done) {
+        const note = isImage ? "\n\nNote for the reviewer: the learner uploaded a screenshot, but it could not be opened. Judge from the explanation and link. If that is not enough evidence, do not pass it; ask them to add a link to their work or describe it in more detail." : "";
+        try {
+          const out = await chat({ models: TEXT_MODELS, maxTokens: 2500, temperature: 0.2, messages: [sys, { role: "user", content: promptText + note }] });
+          text = out.text;
+        } catch (e) {
+          return res.status(502).json({ error: friendly(e, "The AI reviewer") });
+        }
+      }
     } else {
       const content = [];
       if (isImage) content.push({ type: "image", source: { type: "base64", media_type: file.type, data: file.data } });
