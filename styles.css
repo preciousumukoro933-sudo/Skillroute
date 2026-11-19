@@ -269,3 +269,18 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0 0 .5em; l
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- accounts ---------- */
+.nav-r { display: flex; align-items: center; gap: .6rem; }
+.nav-r .btn { padding: .55rem 1.1rem; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font: 800 1rem var(--display); text-decoration: none; }
+.avatar.big { width: 72px; height: 72px; font-size: 1.8rem; margin-bottom: 1rem; }
+.auth { display: grid; place-items: center; padding: 3rem 0 5rem; }
+.auth-card { width: 100%; max-width: 28rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 2rem 1.6rem; box-shadow: var(--shadow); }
+.auth-card .tabs { margin: 0 0 1.4rem; }
+.auth-card h1 { font-size: 1.7rem; }
+.auth-card .sub { color: var(--muted); margin: 0 0 .4rem; }
+.auth-card .form input { font: inherit; color: var(--ink); background: var(--bg); border: 2px solid var(--line); border-radius: var(--r-sm); padding: .75rem .9rem; width: 100%; font-weight: 400; }
+.auth-card .form input:focus { border-color: var(--brand); outline: none; }
+.linkish { background: none; border: 0; color: var(--brand); font-weight: 700; padding: .2rem 0; justify-self: start; }
+.hello { font-weight: 700; color: var(--brand); margin: 0 0 .6rem; }

@@ -1,0 +1,5 @@
+-- SkillRoute database (already applied to the Skillroute Supabase project)
+-- Tables: profiles (name, email) and progress (points, classes done, answers).
+-- Row Level Security: each learner can only read and change their own rows.
+-- A trigger creates a profile automatically on sign-up.
+-- See the "SkillRoute Learners" notebook in Supabase to view all learners.

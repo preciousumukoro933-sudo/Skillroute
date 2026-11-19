@@ -35,3 +35,10 @@ To embed a specific YouTube video, add `videoId: "abc123XYZ"` inside that module
 2. Framework preset: Other. Leave build command and output directory empty.
 3. Under Environment Variables, add `GROQ_API_KEY` (or `ANTHROPIC_API_KEY` to use Claude).
 4. Deploy. The reviewer runs from `api/vet.js` at `/api/vet`.
+
+## Accounts (Supabase)
+
+- Project: Skillroute (`lzhinqwkakccpmlbfmjp`). URL and public key are in `config.js`.
+- Learners must log in to start a class; progress syncs to the `progress` table.
+- View all learners: Supabase dashboard > SQL Editor > notebook "SkillRoute Learners".
+- Set Authentication > URL Configuration > Site URL to your Vercel link so email links open your site.

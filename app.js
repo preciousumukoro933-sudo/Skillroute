@@ -11,8 +11,51 @@
   function multiplier(streak) { return streak >= 5 ? 2 : streak >= 3 ? 1.5 : streak >= 2 ? 1.2 : 1; }
 
   // ---------- storage ----------
+  // ---------- accounts (Supabase) ----------
+  var sb = (window.supabase && SITE.supabaseUrl && SITE.supabaseKey) ? window.supabase.createClient(SITE.supabaseUrl, SITE.supabaseKey) : null;
+  var user = null;
+  var OWNER = "skillroute-owner";
+
   function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
-  function save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
+  function save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} scheduleSync(); }
+  function summary(d) {
+    var pts = 0, done = 0;
+    Object.keys(d).forEach(function (k) { var c = d[k]; if (c && typeof c === "object") { pts += totalPts(c); if (c.done) done++; } });
+    return { pts: pts, done: done };
+  }
+  function scheduleSync() {
+    if (!sb || !user) return;
+    clearTimeout(scheduleSync.t);
+    scheduleSync.t = setTimeout(pushProgress, 800);
+  }
+  function pushProgress() {
+    if (!sb || !user) return Promise.resolve();
+    var d = load(), sm = summary(d);
+    return sb.from("progress").upsert({ user_id: user.id, data: d, total_points: sm.pts, classes_done: sm.done, updated_at: new Date().toISOString() })
+      .then(function (r) { if (r.error) console.error("Sync failed", r.error); });
+  }
+  function better(a, b) {
+    if (!a) return b; if (!b) return a;
+    var pa = totalPts(a), pb = totalPts(b);
+    if (pa !== pb) return pa > pb ? a : b;
+    return (a.step || 0) >= (b.step || 0) ? a : b;
+  }
+  function pullAndMerge() {
+    var owner = localStorage.getItem(OWNER);
+    var local = (!owner || owner === user.id) ? load() : {};
+    return sb.from("progress").select("data").eq("user_id", user.id).maybeSingle().then(function (r) {
+      var remote = (r.data && r.data.data) || {}, merged = {};
+      Object.keys(local).concat(Object.keys(remote)).forEach(function (k) { merged[k] = better(local[k], remote[k]); });
+      try { localStorage.setItem(KEY, JSON.stringify(merged)); localStorage.setItem(OWNER, user.id); } catch (e) {}
+      return pushProgress();
+    });
+  }
+  function setUser(u) {
+    user = u || null;
+    if (!user) return Promise.resolve();
+    return pullAndMerge().catch(function (e) { console.error(e); });
+  }
+  function displayName() { return user ? ((user.user_metadata && user.user_metadata.full_name) || user.email.split("@")[0]) : ""; }
   function cls(sid, i) { var d = load(); return d[sid + ":" + i] || { step: 0, answers: {}, points: 0, streak: 0, best: 0, done: false }; }
   function saveCls(sid, i, c) { var d = load(); d[sid + ":" + i] = c; save(d); }
 
@@ -39,13 +82,24 @@
   function setTitle(t) { document.title = t ? t + " | " + SITE.name : SITE.name + ": learn a digital skill from zero"; }
   function nav() {
     return '<header class="nav"><div class="wrap"><a class="logo" href="#/"><span class="logo-mark">S</span>' + esc(SITE.name) + "</a>" +
-      '<span class="pts-pill" title="Total points"><span class="coin"></span>' + allStats().pts + "</span></div></header>";
+      '<div class="nav-r"><span class="pts-pill" title="Total points"><span class="coin"></span>' + allStats().pts + "</span>" +
+      (sb ? (user ? '<a class="avatar" href="#/account" title="My account">' + esc(displayName().charAt(0).toUpperCase()) + "</a>" : '<a class="btn" href="#/login">Log in</a>') : "") +
+      "</div></div></header>";
   }
 
   // ---------- router ----------
   function route() {
     var p = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+    document.onkeydown = null;
+    if (p[0] === "login") return loginPage();
+    if (p[0] === "reset") return resetPage();
+    if (p[0] === "account") return user ? accountPage() : (location.hash = "#/login");
     var s = p[0] === "skill" ? find(p[1]) : null;
+    if (s && p[2] === "class" && sb && !user) {
+      try { sessionStorage.setItem("skillroute-next", location.hash); } catch (e) {}
+      location.hash = "#/login";
+      return;
+    }
     if (s && p[2] === "class") {
       var i = Number(p[3]);
       if (Number.isInteger(i) && i >= 0 && i < s.modules.length) return player(s, i);
@@ -71,7 +125,7 @@
     app.innerHTML = nav() +
       '<main class="wrap">' +
         '<section class="hero">' +
-          "<div><h1>Learn a digital skill by doing it, not just reading about it.</h1>" +
+          "<div>" + (user ? '<p class="hello">👋 Welcome back, ' + esc(displayName()) + "</p>" : "") + "<h1>Learn a digital skill by doing it, not just reading about it.</h1>" +
           "<p>Pick a skill and go class by class. Every class teaches you step by step, asks you questions as you go, and ends with a real project that AI reviews for you.</p>" +
           '<div class="hero-steps"><span>📖 Learn in short steps</span><span>❓ Answer as you go</span><span>🔥 Build a score</span><span>🛠️ Ship a project</span></div></div>' +
           '<div class="matcher"><h2>Not sure where to start?</h2><p style="margin:0 0 .8rem;color:var(--muted)">Pick the one that sounds most like you.</p>' +
@@ -419,6 +473,106 @@
     });
   }
 
+  // ---------- auth pages ----------
+  function authShell(inner) {
+    return nav() + '<main class="wrap"><section class="auth">' + inner + "</section></main>";
+  }
+  function goNext() {
+    var n = "#/"; try { n = sessionStorage.getItem("skillroute-next") || "#/"; sessionStorage.removeItem("skillroute-next"); } catch (e) {}
+    location.hash = n;
+  }
+  function loginPage(mode) {
+    setTitle("Log in");
+    if (!sb) { app.innerHTML = authShell("<h1>Accounts aren’t set up yet</h1><p>Add your Supabase URL and key in config.js.</p>"); return; }
+    if (user) { goNext(); return; }
+    mode = mode || "in";
+    var up = mode === "up";
+    app.innerHTML = authShell(
+      '<div class="auth-card"><div class="tabs" role="tablist"><button role="tab" aria-selected="' + !up + '" data-mode="in">Log in</button><button role="tab" aria-selected="' + up + '" data-mode="up">Create account</button></div>' +
+      "<h1>" + (up ? "Start learning for free" : "Welcome back") + '</h1><p class="sub">' + (up ? "Create an account so your points and progress follow you on any device." : "Log in to continue where you stopped.") + "</p>" +
+      '<form class="form" id="auth" novalidate>' +
+        (up ? '<label>Full name<input name="name" autocomplete="name" required></label>' : "") +
+        '<label>Email<input type="email" name="email" autocomplete="email" required></label>' +
+        '<label>Password<input type="password" name="password" autocomplete="' + (up ? "new-password" : "current-password") + '" minlength="6" required>' + (up ? '<span class="hint">At least 6 characters</span>' : "") + "</label>" +
+        '<button class="btn big" type="submit">' + (up ? "Create account" : "Log in") + "</button>" +
+        (up ? "" : '<button type="button" class="linkish" id="forgot">Forgot your password?</button>') +
+      '</form><div id="auth-out" aria-live="polite"></div></div>');
+    app.querySelectorAll("[data-mode]").forEach(function (b) { b.addEventListener("click", function () { loginPage(b.dataset.mode); }); });
+    var form = document.getElementById("auth"), out = document.getElementById("auth-out");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var email = form.email.value.trim(), pw = form.password.value, name = up ? form.name.value.trim() : "";
+      if (up && !name) { out.innerHTML = '<p class="msg warn">Please enter your name.</p>'; return; }
+      if (!/^\S+@\S+\.\S+$/.test(email)) { out.innerHTML = '<p class="msg warn">Please enter a valid email.</p>'; return; }
+      if (pw.length < 6) { out.innerHTML = '<p class="msg warn">Your password needs at least 6 characters.</p>'; return; }
+      var btn = form.querySelector("button[type=submit]"); btn.disabled = true; btn.innerHTML = '<span class="loader"></span> Please wait…';
+      var req = up
+        ? sb.auth.signUp({ email: email, password: pw, options: { data: { full_name: name }, emailRedirectTo: location.origin + location.pathname } })
+        : sb.auth.signInWithPassword({ email: email, password: pw });
+      req.then(function (r) {
+        if (r.error) throw r.error;
+        if (up && !r.data.session) { out.innerHTML = '<p class="msg">✅ Account created. Check your email and tap the confirmation link, then log in.</p>'; return; }
+        return setUser(r.data.user).then(goNext);
+      }).catch(function (err) {
+        var m = err.message || "Something went wrong.";
+        if (/invalid login/i.test(m)) m = "Email or password is wrong.";
+        if (/not confirmed/i.test(m)) m = "Please confirm your email first. Check your inbox.";
+        if (/already registered/i.test(m)) m = "This email already has an account. Log in instead.";
+        out.innerHTML = '<p class="msg warn">' + esc(m) + "</p>";
+      }).then(function () { btn.disabled = false; btn.textContent = up ? "Create account" : "Log in"; });
+    });
+    var fg = document.getElementById("forgot");
+    if (fg) fg.addEventListener("click", function () {
+      var email = form.email.value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(email)) { out.innerHTML = '<p class="msg warn">Type your email above first, then tap “Forgot your password?”.</p>'; return; }
+      sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }).then(function (r) {
+        out.innerHTML = r.error ? '<p class="msg warn">' + esc(r.error.message) + "</p>" : '<p class="msg">📧 If that email has an account, a reset link is on its way.</p>';
+      });
+    });
+  }
+  function resetPage() {
+    setTitle("Set a new password");
+    app.innerHTML = authShell('<div class="auth-card"><h1>Set a new password</h1><form class="form" id="rp" novalidate><label>New password<input type="password" name="password" minlength="6" autocomplete="new-password" required></label><button class="btn big" type="submit">Save password</button></form><div id="rp-out" aria-live="polite"></div></div>');
+    var f = document.getElementById("rp"), out = document.getElementById("rp-out");
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (f.password.value.length < 6) { out.innerHTML = '<p class="msg warn">At least 6 characters, please.</p>'; return; }
+      sb.auth.updateUser({ password: f.password.value }).then(function (r) {
+        if (r.error) out.innerHTML = '<p class="msg warn">' + esc(r.error.message) + "</p>";
+        else { toast("Password updated"); location.hash = "#/"; }
+      });
+    });
+  }
+  function accountPage() {
+    setTitle("My account");
+    var st = allStats();
+    app.innerHTML = authShell('<div class="auth-card"><div class="avatar big">' + esc(displayName().charAt(0).toUpperCase()) + "</div><h1>" + esc(displayName()) + '</h1><p class="sub">' + esc(user.email) + "</p>" +
+      '<div class="result-grid"><div><b>' + st.pts + "</b><span>points</span></div><div><b>" + st.done + "</b><span>classes done</span></div><div><b>" + st.best + "</b><span>best streak</span></div></div>" +
+      '<p class="sub" style="margin-top:1.2rem">Your progress is saved to your account, so you can continue on any device.</p>' +
+      '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1rem"><a class="btn" href="#/">Keep learning</a><button class="btn soft" id="logout" type="button">Log out</button></div></div>');
+    document.getElementById("logout").addEventListener("click", function () {
+      pushProgress().then(function () { return sb.auth.signOut(); }).then(function () {
+        user = null;
+        try { localStorage.removeItem(KEY); localStorage.removeItem(OWNER); } catch (e) {}
+        location.hash = "#/";
+        route();
+      });
+    });
+  }
+
   window.addEventListener("hashchange", route);
-  route();
+  if (sb) {
+    sb.auth.getSession().then(function (r) { return setUser(r.data.session && r.data.session.user); }).then(function () {
+      sb.auth.onAuthStateChange(function (ev, session) {
+        setTimeout(function () {
+          if (ev === "PASSWORD_RECOVERY") { location.hash = "#/reset"; return; }
+          if (ev === "SIGNED_IN" && session && (!user || user.id !== session.user.id)) setUser(session.user).then(route);
+          if (ev === "SIGNED_OUT" && user) { user = null; route(); }
+        }, 0);
+      });
+      route();
+    });
+  } else {
+    route();
+  }
 })();
