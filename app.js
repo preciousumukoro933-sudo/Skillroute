@@ -134,7 +134,10 @@
   function route() {
     var p = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
     document.onkeydown = null;
+    ZCTX = {};
+    document.body.dataset.view = p[0] === "login" ? "login" : (p[0] === "skill" && p[2] === "class") ? "player" : "page";
     if (p[0] === "login") return loginPage();
+    if (p[0] === "admin") return user ? adminPage() : (location.hash = "#/login");
     if (p[0] === "account") return user ? accountPage() : (location.hash = "#/login");
     if (p[0] === "learn") return learnPage();
     if (p[0] === "leaderboard") return leaderboardPage();
@@ -187,7 +190,7 @@
       '<section class="hero2"><div class="wrap hero2-in">' +
         "<div>" + (user ? '<p class="hello">Welcome back, ' + esc(displayName().split(" ")[0]) + "</p>" : '<p class="eyebrow">Free digital skills school</p>') +
           "<h1>Go from zero to your first gig.</h1>" +
-          '<p class="hero-sub">Interactive classes that teach you step by step, test you as you learn, and end with real projects reviewed by AI. No long videos. No confusion about where to start.</p>' +
+          '<p class="hero-sub">Interactive classes that teach you step by step, an AI tutor that answers your questions, and real projects reviewed by AI. No long videos. No confusion about where to start.</p>' +
           '<div class="hero-cta"><a class="btn big" href="' + (user || !sb ? "#skills" : "#/login") + '" data-scroll="skills">' + (user ? "Continue learning" : "Start learning free") + '</a><a class="btn soft big" href="#skills" data-scroll="skills">Browse skills</a></div>' +
           '<dl class="hero-stats"><div><dt>' + T.skills + "</dt><dd>skills</dd></div><div><dt>" + T.classes + "</dt><dd>classes</dd></div><div><dt>" + T.questions + "</dt><dd>questions</dd></div><div><dt>" + T.resources + "+</dt><dd>resources</dd></div></dl>" +
         "</div>" +
@@ -196,7 +199,7 @@
           '<div class="pv-o">A&nbsp;&nbsp;Margin</div><div class="pv-o right">B&nbsp;&nbsp;Padding<span>+15</span></div><div class="pv-o">C&nbsp;&nbsp;Outline</div>' +
           '<div class="pv-f"><b>Correct!</b> Padding is the space inside the border.</div></div>' +
       "</div></section>" +
-      '<div class="wrap">' + cont +
+      '<div class="wrap"><div id="daily"></div>' + cont +
         '<section class="section" id="skills"><div class="sec-head"><div><h2>Choose a skill</h2><p class="sec-sub">Every skill is free and starts from the very beginning.</p></div>' +
           '<label class="search">' + svg("search", 18) + '<input type="search" id="q" placeholder="Search skills" aria-label="Search skills"></label></div>' +
           '<div class="courses" id="courses">' + SKILLS.map(courseCard).join("") + '</div><p class="empty-note" id="none" hidden>No skill matches that search.</p></section>' +
@@ -212,8 +215,8 @@
           [["learn", "Interactive classes", "Lessons, tappable diagrams and questions in one smooth flow."],
            ["board", "Leaderboard", "See how your points compare with other learners."],
            ["check", "Certificates", "Finish all the classes in a skill and download your certificate."],
-           ["ai-automation", "AI project reviews", "Instant, specific feedback on the work you build."],
-           ["data-analysis", "Progress tracking", "Your points, streaks and classes follow you on any device."],
+           ["data-analysis", "AI project reviews and daily streaks", "Instant feedback on what you build, and a streak that keeps you learning every day."],
+           ["ai-automation", "Zee, your AI tutor", "Stuck? Ask Zee. It knows the class you’re on and explains things simply."],
            ["content-writing", "Resource library", T.resources + "+ extra courses, templates and tools, sorted by skill."]]
             .map(function (x) { return '<div class="feature"><span class="f-ico">' + svg(x[0], 22) + "</span><h3>" + x[1] + "</h3><p>" + x[2] + "</p></div>"; }).join("") + "</div></section>" +
         '<section class="section faq"><h2>Questions people ask</h2>' +
@@ -221,6 +224,7 @@
            ["I’ve never done anything digital before. Can I start?", "Yes. Every skill starts from zero and explains things in plain language."],
            ["How long does a class take?", "About 15 to 20 minutes for the lesson and questions. The project at the end takes longer, because you build something real."],
            ["Do I get a certificate?", "Yes. When you finish all 4 classes in a skill, you can download a certificate with your name on it."],
+           ["What is Zee?", "Zee is the AI tutor built into Zero2Gig. Tap “Ask Zee” on any page to ask a question, get a simpler explanation, or be quizzed on your class."],
            ["Can I learn on my phone?", "Yes. The whole site is built for phones first, and your progress syncs to your Google account."]]
             .map(function (x) { return "<details><summary>" + x[0] + "</summary><p>" + x[1] + "</p></details>"; }).join("") + "</section>" +
         '<section class="cta-band"><h2>Your first class is 15 minutes away.</h2><p>Pick a skill and start now. It’s free.</p><a class="btn big light" href="' + (user || !sb ? "#skills" : "#/login") + '" data-scroll="skills">' + (user ? "Pick a skill" : "Start learning free") + "</a></section>" +
@@ -230,6 +234,7 @@
       if (a.getAttribute("href").charAt(1) === "/") return;
       a.addEventListener("click", function (e) { e.preventDefault(); document.getElementById(a.dataset.scroll).scrollIntoView({ behavior: "smooth" }); });
     });
+    loadDaily(last);
     var q = document.getElementById("q");
     q.addEventListener("input", function () {
       var v = q.value.trim().toLowerCase(), shown = 0;
@@ -254,6 +259,7 @@
     var q = s.modules.reduce(function (a, m) { return a + m.questions.length; }, 0);
     var nx = nextClass(s), started = k.done > 0 || cls(s.id, 0).step > 0, complete = isComplete(s);
     var learn = []; s.modules.forEach(function (m) { learn.push(m.keyPoints[0], m.keyPoints[1]); });
+    ZCTX = { skill: s.title, text: s.intro };
 
     var classesHTML = '<div class="classes">' + s.modules.map(function (m, i) {
       var c = cls(s.id, i);
@@ -431,6 +437,7 @@
     var steps = buildSteps(m);
     var c = cls(s.id, ci);
     try { localStorage.setItem("z2g-last", JSON.stringify({ sid: s.id, ci: ci })); } catch (e) {}
+    if (sb && user) sb.rpc("touch_activity").then(function (r) { if (r.error) console.error(r.error); });
     if (c.step >= steps.length) c.step = steps.length - 1;
 
     app.innerHTML =
@@ -492,6 +499,7 @@
       if (st.t === "q") bindQuestion(st.i);
       if (st.t === "finish") bindFinish();
       updateTop();
+      ZCTX = { skill: s.title, klass: "Class " + (ci + 1) + ": " + m.title, text: (st.t === "finish" ? "Project: " + m.assignment.task : stage.innerText).slice(0, 1500) };
       window.scrollTo(0, 0);
     }
 
@@ -633,6 +641,129 @@
     });
   }
 
+  // ---------- daily streak ----------
+  function loadDaily(last) {
+    var box = document.getElementById("daily");
+    if (!box || !sb || !user) return;
+    sb.rpc("my_streak").then(function (r) {
+      if (r.error || !r.data || !document.getElementById("daily")) return;
+      var d = r.data, n = d.streak || 0, href = "#skills", ls = last && find(last.sid);
+      if (ls && ls.modules[last.ci]) href = "#/skill/" + ls.id + "/class/" + last.ci;
+      var title, sub, cta = "";
+      if (d.learned_today) { title = "🔥 " + n + "-day streak"; sub = "You’ve learned today. Come back tomorrow to keep it going."; }
+      else if (n > 0) { title = "🔥 Your " + n + "-day streak ends today"; sub = "Take one class before midnight to keep it alive."; cta = "Learn now"; }
+      else { title = "Start your daily streak"; sub = "Learn for 15 minutes a day. One class today starts your streak."; cta = "Take today’s class"; }
+      box.innerHTML = '<section class="daily' + (d.learned_today ? " ok" : "") + '"><div><b>' + title + "</b><span>" + sub + "</span></div>" + (cta ? '<a class="btn" href="' + href + '"' + (href === "#skills" ? ' data-daily-scroll' : "") + ">" + cta + "</a>" : "") + "</section>";
+      var a = box.querySelector("[data-daily-scroll]");
+      if (a) a.addEventListener("click", function (e) { e.preventDefault(); document.getElementById("skills").scrollIntoView({ behavior: "smooth" }); });
+    });
+  }
+
+  // ---------- admin dashboard ----------
+  function fmtDay(d) { return d ? new Date(d + (String(d).length === 10 ? "T12:00:00" : "")).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "Never"; }
+  function adminPage() {
+    setTitle("Admin");
+    app.innerHTML = nav() + '<main class="wrap page"><h1>Admin dashboard</h1><p class="sec-sub">Who is joining and who is learning. Days use Lagos time.</p><div id="adm"><p class="msg"><span class="loader"></span> Loading…</p></div></main>';
+    var out = document.getElementById("adm");
+    sb.rpc("admin_overview").then(function (r) {
+      if (r.error) { out.innerHTML = '<div class="empty"><h2>This page is for admins only</h2><p>You’re signed in as ' + esc(user.email) + '.</p><a class="btn big" href="#/">Back to the site</a></div>'; return; }
+      var d = r.data, list = d.list || [], daily = d.daily || [];
+      var max = Math.max.apply(null, daily.map(function (x) { return Math.max(x.signups, x.active); }).concat([1]));
+      var todayMs = Date.parse(d.today + "T12:00:00");
+      var cold = list.filter(function (x) { return !x.last_day || (todayMs - Date.parse(x.last_day + "T12:00:00")) / 864e5 >= 2; });
+      var subject = "Your Zero2Gig class is waiting", body = "Hi,\n\nYou haven’t taken a class on Zero2Gig for a few days. It only takes 15 minutes to keep your streak going.\n\nContinue here: " + location.origin + "\n\nSee you in class!";
+      function tile(v, l) { return '<div class="stat"><b>' + v + "</b><span>" + l + "</span></div>"; }
+      function rowsHTML(arr) {
+        return arr.map(function (x) {
+          return "<tr><td><b>" + esc(x.name || "Learner") + "</b><small>" + esc(x.email || "") + "</small></td><td>" + x.points + "</td><td>" + x.classes + "</td><td>" + x.days + "</td><td>" + fmtDay(String(x.joined).slice(0, 10)) + "</td><td>" + fmtDay(x.last_day) + "</td></tr>";
+        }).join("") || '<tr><td colspan="6">No learners match.</td></tr>';
+      }
+      out.innerHTML =
+        '<section class="stats adm-stats">' + tile(d.learners, "Total learners") + tile(d.new_today, "Joined today") + tile(d.active_today, "Learning today") + tile(d.new_7d, "Joined this week") + tile(d.active_7d, "Active this week") + tile(d.classes_done, "Classes finished") + "</section>" +
+        '<section class="panel"><div class="panel-h"><h2>Last 14 days</h2><div class="legend"><span><i class="l1"></i>Joined</span><span><i class="l2"></i>Learning</span></div></div>' +
+          '<div class="bars" role="img" aria-label="Daily sign-ups and active learners for the last 14 days">' + daily.map(function (x) {
+            return '<div class="bar-col" title="' + fmtDay(x.day) + ": " + x.signups + " joined, " + x.active + ' learning"><div class="bar-pair"><i class="l1" style="height:' + (x.signups / max * 100) + '%"></i><i class="l2" style="height:' + (x.active / max * 100) + '%"></i></div><span>' + new Date(x.day + "T12:00:00").getDate() + "</span></div>";
+          }).join("") + "</div>" +
+          '<details class="tbl-alt"><summary>Show the numbers</summary><table class="tbl"><thead><tr><th>Day</th><th>Joined</th><th>Learning</th></tr></thead><tbody>' + daily.slice().reverse().map(function (x) { return "<tr><td>" + fmtDay(x.day) + "</td><td>" + x.signups + "</td><td>" + x.active + "</td></tr>"; }).join("") + "</tbody></table></details></section>" +
+        '<section class="panel"><div class="panel-h"><div><h2>Needs a reminder (' + cold.length + ')</h2><p class="sec-sub">Learners who haven’t taken a class in 2 or more days.</p></div>' +
+          (cold.length ? '<div class="panel-a"><button class="btn soft" id="copy-cold" type="button">Copy emails</button><a class="btn" id="mail-cold" href="#">Email them</a></div>' : "") + "</div>" +
+          (cold.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Learner</th><th>Points</th><th>Classes</th><th>Days learned</th><th>Joined</th><th>Last learned</th></tr></thead><tbody>' + rowsHTML(cold.slice(0, 50)) + "</tbody></table></div>" + (cold.length > 50 ? '<p class="sec-sub">Showing the first 50. “Copy emails” copies all ' + cold.length + ".</p>" : "") : '<p class="msg">Everyone has learned in the last 2 days. 🎉</p>') + "</section>" +
+        '<section class="panel"><div class="panel-h"><h2>All learners (' + list.length + ')</h2><div class="panel-a"><label class="search">' + svg("search", 18) + '<input type="search" id="adm-q" placeholder="Search name or email" aria-label="Search learners"></label><button class="btn soft" id="csv" type="button">Export CSV</button></div></div>' +
+          '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Learner</th><th>Points</th><th>Classes</th><th>Days learned</th><th>Joined</th><th>Last learned</th></tr></thead><tbody id="adm-rows">' + rowsHTML(list) + "</tbody></table></div></section>";
+
+      var cc = document.getElementById("copy-cold");
+      if (cc) {
+        cc.addEventListener("click", function () {
+          var txt = cold.map(function (x) { return x.email; }).filter(Boolean).join(", ");
+          (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { toast("Emails copied"); }, function () { window.prompt("Copy these emails:", txt); });
+        });
+        document.getElementById("mail-cold").href = "mailto:?bcc=" + encodeURIComponent(cold.slice(0, 40).map(function (x) { return x.email; }).filter(Boolean).join(",")) + "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+      }
+      document.getElementById("adm-q").addEventListener("input", function (e) {
+        var v = e.target.value.trim().toLowerCase();
+        document.getElementById("adm-rows").innerHTML = rowsHTML(list.filter(function (x) { return ((x.name || "") + " " + (x.email || "")).toLowerCase().indexOf(v) !== -1; }));
+      });
+      document.getElementById("csv").addEventListener("click", function () {
+        var q = function (v) { return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; };
+        var csv = "Name,Email,Points,Classes,Days learned,Joined,Last learned\n" + list.map(function (x) { return [q(x.name), q(x.email), x.points, x.classes, x.days, q(String(x.joined).slice(0, 10)), q(x.last_day || "")].join(","); }).join("\n");
+        var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "zero2gig-learners-" + d.today + ".csv"; a.click();
+      });
+    });
+  }
+
+  // ---------- Zee, the AI tutor ----------
+  var ZCTX = {}, zMsgs = [], zBusy = false;
+  var ZEE_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9L12 2zM19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9L19 15z"/></svg>';
+  function zeeInit() {
+    var w = document.createElement("div");
+    w.innerHTML = '<button class="zee-fab" id="zee-fab" type="button" aria-haspopup="dialog">' + ZEE_ICON + "<span>Ask Zee</span></button>" +
+      '<section class="zee" id="zee" role="dialog" aria-label="Zee, your AI tutor" hidden>' +
+        '<header><span class="zee-av">' + ZEE_ICON + '</span><div><b>Zee</b><small>Your AI tutor</small></div><button type="button" id="zee-x" aria-label="Close chat">✕</button></header>' +
+        '<div class="zee-log" id="zee-log" aria-live="polite"></div>' +
+        '<div class="zee-sug" id="zee-sug"></div>' +
+        '<form id="zee-form"><textarea id="zee-in" rows="1" placeholder="Ask Zee anything…" aria-label="Message Zee" maxlength="1500"></textarea><button class="btn" type="submit" aria-label="Send">➤</button></form>' +
+        '<p class="zee-note">Zee is an AI and can make mistakes.</p>' +
+      "</section>";
+    while (w.firstChild) document.body.appendChild(w.firstChild);
+    var panel = document.getElementById("zee"), fab = document.getElementById("zee-fab"), input = document.getElementById("zee-in");
+    fab.addEventListener("click", function () { panel.hidden = false; fab.hidden = true; zeeRender(); input.focus(); });
+    document.getElementById("zee-x").addEventListener("click", function () { panel.hidden = true; fab.hidden = false; fab.focus(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panel.hidden) document.getElementById("zee-x").click(); });
+    document.getElementById("zee-form").addEventListener("submit", function (e) { e.preventDefault(); zeeSend(input.value); });
+    input.addEventListener("keydown", function (e) { e.stopPropagation(); if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); zeeSend(input.value); } });
+    input.addEventListener("input", function () { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 120) + "px"; });
+  }
+  function zeeRender() {
+    var log = document.getElementById("zee-log"), sug = document.getElementById("zee-sug");
+    var hello = "Hi" + (user ? " " + esc(displayName().split(" ")[0]) : "") + "! I’m Zee, your AI tutor. " + (ZCTX.klass ? "I can see you’re on “" + esc(ZCTX.klass) + "”. Ask me anything about it." : "Ask me anything about the skills here, or how to get your first gig.");
+    log.innerHTML = '<div class="zb bot">' + hello + "</div>" + zMsgs.map(function (m) {
+      return '<div class="zb ' + (m.role === "user" ? "me" : "bot") + (m.err ? " err" : "") + '">' + esc(m.content) + "</div>";
+    }).join("") + (zBusy ? '<div class="zb bot typing"><i></i><i></i><i></i></div>' : "");
+    log.scrollTop = log.scrollHeight;
+    var ideas = ZCTX.klass ? ["Explain this more simply", "Give me a real-life example", "Quiz me on this class"] : ZCTX.skill ? ["Is this skill right for me?", "How do I earn with this skill?", "What should I learn first?"] : ["Which skill should I start with?", "How do I get my first gig?", "How do I stay consistent?"];
+    sug.innerHTML = zMsgs.length || zBusy ? "" : ideas.map(function (t) { return '<button type="button">' + t + "</button>"; }).join("");
+    sug.querySelectorAll("button").forEach(function (b) { b.addEventListener("click", function () { zeeSend(b.textContent); }); });
+  }
+  function zeeSend(text) {
+    text = (text || "").trim();
+    if (!text || zBusy) return;
+    var input = document.getElementById("zee-in"); input.value = ""; input.style.height = "auto";
+    if (!sb || !user) {
+      zMsgs.push({ role: "user", content: text }, { role: "assistant", content: "Please log in with Google first, then ask me again. It’s free.", err: true, local: true });
+      zeeRender(); return;
+    }
+    zMsgs.push({ role: "user", content: text }); zBusy = true; zeeRender();
+    sb.auth.getSession().then(function (r) {
+      var token = r.data.session && r.data.session.access_token;
+      return fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ messages: zMsgs.filter(function (m) { return !m.local && !m.err; }).slice(-12).map(function (m) { return { role: m.role, content: m.content }; }), context: ZCTX }) });
+    }).then(function (res) {
+      return res.json().catch(function () { return { error: "Zee couldn’t answer just now. Please try again." }; }).then(function (d) { if (!res.ok || d.error) throw new Error(d.error || "Zee couldn’t answer just now."); return d; });
+    }).then(function (d) { zMsgs.push({ role: "assistant", content: d.reply }); })
+      .catch(function (err) { zMsgs.push({ role: "assistant", content: err.message || "Zee couldn’t answer just now. Please try again.", err: true }); })
+      .then(function () { zBusy = false; zeeRender(); });
+  }
+
   // ---------- auth pages ----------
   function authShell(inner) {
     return nav() + '<main class="wrap"><section class="auth">' + inner + "</section></main>";
@@ -700,7 +831,8 @@
     app.innerHTML = authShell('<div class="auth-card"><div class="avatar big">' + avatarHTML("av-img") + "</div><h1>" + esc(displayName()) + '</h1><p class="sub">' + esc(user.email) + "</p>" +
       '<div class="result-grid"><div><b>' + st.pts + "</b><span>points</span></div><div><b>" + st.done + "</b><span>classes done</span></div><div><b>" + st.best + "</b><span>best streak</span></div></div>" +
       '<p class="sub" style="margin-top:1.2rem">Your progress is saved to your account, so you can continue on any device.</p>' +
-      '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1rem"><a class="btn" href="#/">Keep learning</a><button class="btn soft" id="logout" type="button">Log out</button></div></div>');
+      '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1rem"><a class="btn" href="#/">Keep learning</a><a class="btn soft" id="admin-link" href="#/admin" hidden>Admin dashboard</a><button class="btn soft" id="logout" type="button">Log out</button></div></div>');
+    sb.rpc("is_admin").then(function (r) { var a = document.getElementById("admin-link"); if (a && r.data === true) a.hidden = false; });
     document.getElementById("logout").addEventListener("click", function () {
       pushProgress().then(function () { return sb.auth.signOut(); }).then(function () {
         user = null;
@@ -719,6 +851,7 @@
   try { var savedTheme = localStorage.getItem("z2g-theme"); if (savedTheme) document.documentElement.dataset.theme = savedTheme; } catch (e) {}
   new MutationObserver(function () { bindTheme(); }).observe(app, { childList: true, subtree: false });
 
+  zeeInit();
   window.addEventListener("hashchange", route);
   if (sb) {
     sb.auth.getSession().then(function (r) { return setUser(r.data.session && r.data.session.user).then(function () { return !!(r.data.session); }); }).then(function (signedIn) {

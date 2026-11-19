@@ -1,5 +1,6 @@
 {
   "functions": {
-    "api/vet.js": { "maxDuration": 60 }
+    "api/vet.js": { "maxDuration": 60 },
+    "api/ask.js": { "maxDuration": 30 }
   }
 }
