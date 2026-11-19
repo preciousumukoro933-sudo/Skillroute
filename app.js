@@ -2,7 +2,7 @@
   "use strict";
   var SKILLS = window.SKILLS || [];
   var FREELANCE = window.FREELANCE || [];
-  var SITE = window.SITE || { name: "SkillRoute", apiPath: "/api/vet" };
+  var SITE = window.SITE || { name: "Zero2Gig", apiPath: "/api/vet" };
   var app = document.getElementById("app");
   var KEY = "skillroute-v2";
 

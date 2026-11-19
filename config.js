@@ -1,6 +1,6 @@
 // Change the site name here. Everything else picks it up.
 window.SITE = {
-  name: "SkillRoute",
+  name: "Zero2Gig",
   apiPath: "/api/vet",
   // Supabase (accounts + progress tracking). The publishable key is safe to expose;
   // Row Level Security in the database keeps each learner's data private.

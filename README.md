@@ -1,4 +1,4 @@
-# SkillRoute
+# Zero2Gig
 
 A learning site where beginners pick a digital skill and follow a route of lessons, videos and AI-reviewed assignments.
 
@@ -38,7 +38,7 @@ To embed a specific YouTube video, add `videoId: "abc123XYZ"` inside that module
 
 ## Accounts (Supabase)
 
-- Project: Skillroute (`lzhinqwkakccpmlbfmjp`). URL and public key are in `config.js`.
+- Supabase project: Skillroute (`lzhinqwkakccpmlbfmjp`). URL and public key are in `config.js`.
 - Learners must log in to start a class; progress syncs to the `progress` table.
 - View all learners: Supabase dashboard > SQL Editor > notebook "SkillRoute Learners".
 - Set Authentication > URL Configuration > Site URL to your Vercel link so email links open your site.

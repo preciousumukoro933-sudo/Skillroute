@@ -39,7 +39,7 @@ async function fetchPage(url) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "SkillRoute-Reviewer" } });
+    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Zero2Gig-Reviewer" } });
     if (!r.ok) return `(The link returned status ${r.status}, so its content could not be read.)`;
     let text = await r.text();
     if ((r.headers.get("content-type") || "").includes("html")) {

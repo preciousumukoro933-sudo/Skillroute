@@ -1,4 +1,4 @@
--- SkillRoute database (already applied to the Skillroute Supabase project)
+-- Zero2Gig database (applied to the "Skillroute" Supabase project)
 -- Tables: profiles (name, email) and progress (points, classes done, answers).
 -- Row Level Security: each learner can only read and change their own rows.
 -- A trigger creates a profile automatically on sign-up.
