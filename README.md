@@ -19,6 +19,8 @@ A learning site where beginners pick a digital skill and follow a route of lesso
 
 ## Editing content
 
+Each class teaches in steps, shows a diagram, asks questions (points + streak bonus), then ends with an AI-reviewed project. Resource links per skill come from the Digital Skill Bank.
+
 Open `data/skills.js`. Each skill has 4 modules; each module has `lesson` paragraphs, `keyPoints`, a `video`, and an `assignment`.
 To embed a specific YouTube video, add `videoId: "abc123XYZ"` inside that module's `video` object.
 
