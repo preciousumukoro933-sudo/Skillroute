@@ -84,11 +84,50 @@
     document.body.appendChild(p); setTimeout(function () { p.remove(); }, 900);
   }
   function setTitle(t) { document.title = t ? t + " | " + SITE.name : SITE.name + ": learn a digital skill from zero"; }
-  function nav() {
-    return '<header class="nav"><div class="wrap"><a class="logo" href="#/"><span class="logo-mark">' + LOGO_SVG + '</span>' + esc(SITE.name) + "</a>" +
+  var ICONS = {
+    frontend: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M10 9l-2 2 2 2M14 9l2 2-2 2"/>',
+    backend: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6"/>',
+    uiux: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M9.5 7h5M9.5 11h5M9.5 15h2.5"/>',
+    "graphic-design": '<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/>',
+    "digital-marketing": '<path d="M3 11v2a1 1 0 001 1h2l5 4V6L6 10H4a1 1 0 00-1 1z"/><path d="M15 9a4 4 0 010 6M18 6a8 8 0 010 12"/>',
+    "content-writing": '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+    "data-analysis": '<path d="M5 20V10M11 20V4M17 20v-7M22 20H2"/>',
+    "ai-automation": '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 14h.01M15 14h.01M2 14h2M20 14h2"/><circle cx="12" cy="3" r="1"/>',
+    home: '<path d="M3 11l9-8 9 8M5 10v10h14V10"/>',
+    learn: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z"/><path d="M4 19a2 2 0 012-2h13"/>',
+    board: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4a3 3 0 003 3M17 6h3a3 3 0 01-3 3"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>',
+    check: '<path d="M5 12l5 5 9-10"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'
+  };
+  function svg(name, size) { return '<svg viewBox="0 0 24 24" width="' + (size || 22) + '" height="' + (size || 22) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + "</svg>"; }
+  function ico(s, size) { return svg(s.id, size); }
+  function totals() {
+    var q = 0, c = 0, r = 0;
+    SKILLS.forEach(function (s) { c += s.modules.length; r += (s.resources || []).length; s.modules.forEach(function (m) { q += m.questions.length; }); });
+    return { skills: SKILLS.length, classes: c, questions: q, resources: r };
+  }
+  function nextClass(s) { for (var i = 0; i < s.modules.length; i++) if (!cls(s.id, i).done) return i; return 0; }
+  function isComplete(s) { return skillStats(s).done === s.modules.length; }
+  function getLast() { try { return JSON.parse(localStorage.getItem("z2g-last")); } catch (e) { return null; } }
+  function nav(active) {
+    var links = [["#/", "Skills", "home"], ["#/learn", "My learning", "learn"], ["#/leaderboard", "Leaderboard", "board"]];
+    return '<header class="nav"><div class="wrap"><a class="logo" href="#/"><span class="logo-mark">' + LOGO_SVG + "</span>" + esc(SITE.name) + "</a>" +
+      '<nav class="nav-links" aria-label="Main">' + links.map(function (l) { return '<a href="' + l[0] + '"' + (active === l[2] ? ' aria-current="page"' : "") + ">" + l[1] + "</a>"; }).join("") + "</nav>" +
       '<div class="nav-r">' + themeBtn() + '<span class="pts-pill" title="Total points"><span class="coin"></span>' + allStats().pts + "</span>" +
       (sb ? (user ? '<a class="avatar" href="#/account" title="My account">' + avatarHTML("av-img") + "</a>" : '<a class="btn" href="#/login">Log in</a>') : "") +
-      "</div></div></header>";
+      "</div></div></header>" +
+      '<nav class="tabbar" aria-label="Main">' + links.concat([[user || !sb ? "#/account" : "#/login", user ? "Account" : "Log in", "user"]]).map(function (l) {
+        return '<a href="' + l[0] + '"' + (active === l[2] ? ' aria-current="page"' : "") + ">" + svg(l[2], 22) + "<span>" + l[1] + "</span></a>";
+      }).join("") + "</nav>";
+  }
+  function footer() {
+    return '<footer class="site-foot"><div class="foot-grid">' +
+      '<div><a class="logo" href="#/"><span class="logo-mark">' + LOGO_SVG + "</span>" + esc(SITE.name) + '</a><p>Learn a digital skill from zero, one interactive class at a time.</p></div>' +
+      "<div><h4>Learn</h4>" + SKILLS.slice(0, 4).map(function (s) { return '<a href="#/skill/' + s.id + '">' + esc(s.title) + "</a>"; }).join("") + "</div>" +
+      "<div><h4>More skills</h4>" + SKILLS.slice(4).map(function (s) { return '<a href="#/skill/' + s.id + '">' + esc(s.title) + "</a>"; }).join("") + "</div>" +
+      '<div><h4>Zero2Gig</h4><a href="#/learn">My learning</a><a href="#/leaderboard">Leaderboard</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></div>' +
+      '</div><p class="copy">© 2026 ' + esc(SITE.name) + ". Built for beginners.</p></footer>";
   }
 
   // ---------- router ----------
@@ -97,6 +136,9 @@
     document.onkeydown = null;
     if (p[0] === "login") return loginPage();
     if (p[0] === "account") return user ? accountPage() : (location.hash = "#/login");
+    if (p[0] === "learn") return learnPage();
+    if (p[0] === "leaderboard") return leaderboardPage();
+    if (p[0] === "certificate" && find(p[1])) return certificatePage(find(p[1]));
     var s = p[0] === "skill" ? find(p[1]) : null;
     if (s && p[2] === "class" && sb && !user) {
       try { sessionStorage.setItem("skillroute-next", location.hash); } catch (e) {}
@@ -113,54 +155,94 @@
 
   // ---------- home ----------
   var MATCH = [
-    ["I like building things that work on screens", "frontend"],
-    ["I want to know how apps work behind the scenes", "backend"],
-    ["I care about how apps feel to use", "uiux"],
-    ["I love making things look beautiful", "graphic-design"],
-    ["I want to help businesses sell more", "digital-marketing"],
-    ["I enjoy writing and explaining things", "content-writing"],
-    ["I like numbers and finding patterns", "data-analysis"],
-    ["I want AI to do boring work for me", "ai-automation"]
+    ["Build things that work on screens", "frontend"],
+    ["Know how apps work behind the scenes", "backend"],
+    ["Make apps feel easy to use", "uiux"],
+    ["Make things look beautiful", "graphic-design"],
+    ["Help businesses sell more", "digital-marketing"],
+    ["Write and explain things", "content-writing"],
+    ["Find patterns in numbers", "data-analysis"],
+    ["Let AI do the boring work", "ai-automation"]
   ];
+  function courseCard(s) {
+    var k = skillStats(s), q = s.modules.reduce(function (a, m) { return a + m.questions.length; }, 0);
+    return '<a class="course" id="card-' + s.id + '" data-search="' + esc((s.title + " " + s.tagline).toLowerCase()) + '" href="#/skill/' + s.id + '" style="--c:' + s.color + '">' +
+      '<div class="cover"><span class="cover-ico">' + ico(s, 40) + '</span><span class="badge">Beginner</span>' + (isComplete(s) ? '<span class="badge done">Completed</span>' : "") + "</div>" +
+      '<div class="course-b"><h3>' + esc(s.title) + "</h3><p>" + esc(s.tagline) + "</p>" +
+      '<div class="course-meta">' + s.modules.length + " classes · " + q + " questions · " + esc(s.duration) + "</div>" +
+      (k.done || k.pts
+        ? '<div class="meter"><i style="width:' + k.pct + '%"></i></div><div class="card-foot"><span>' + k.done + " of " + s.modules.length + " classes</span><span>" + k.pts + " pts</span></div>"
+        : '<div class="card-foot"><span class="free">Free</span><span class="go">Start learning →</span></div>') +
+      "</div></a>";
+  }
   function home() {
     setTitle("");
-    var st = allStats();
-    app.innerHTML = nav() +
-      '<main class="wrap">' +
-        '<section class="hero">' +
-          "<div>" + (user ? '<p class="hello">👋 Welcome back, ' + esc(displayName()) + "</p>" : "") + "<h1>Learn a digital skill by doing it, not just reading about it.</h1>" +
-          "<p>Pick a skill and go class by class. Every class teaches you step by step, asks you questions as you go, and ends with a real project that AI reviews for you.</p>" +
-          '<div class="hero-steps"><span>📖 Learn in short steps</span><span>❓ Answer as you go</span><span>🔥 Build a score</span><span>🛠️ Ship a project</span></div></div>' +
-          '<div class="matcher"><h2>Not sure where to start?</h2><p style="margin:0 0 .8rem;color:var(--muted)">Pick the one that sounds most like you.</p>' +
-          '<div class="matcher-opts">' + MATCH.map(function (m, k) { return '<button type="button" data-match="' + k + '" aria-pressed="false">' + esc(m[0]) + "</button>"; }).join("") + "</div>" +
-          '<div id="match-out"></div></div>' +
-        "</section>" +
-        '<section class="stats">' +
-          '<div class="stat"><b>' + st.pts + "</b><span>Total points</span></div>" +
-          '<div class="stat"><b>' + st.done + "</b><span>Classes finished</span></div>" +
-          '<div class="stat"><b>' + st.best + "</b><span>Best streak</span></div>" +
-        "</section>" +
-        '<div class="sec-head"><h2>All skills</h2></div>' +
-        '<section class="grid">' + SKILLS.map(function (s) {
-          var k = skillStats(s);
-          return '<a class="skill-card" id="card-' + s.id + '" href="#/skill/' + s.id + '" style="--c:' + s.color + '">' +
-            '<span class="ico">' + s.icon + "</span><h3>" + esc(s.title) + "</h3><p>" + esc(s.tagline) + "</p>" +
-            '<div class="meter"><i style="width:' + k.pct + '%"></i></div>' +
-            '<div class="card-foot"><span>' + k.done + " of " + s.modules.length + " classes</span><span>" + k.pts + " pts</span></div></a>";
-        }).join("") + "</section>" +
-        '<footer class="foot">© 2026 Zero2Gig · <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a></footer>' +
-      "</main>";
+    var T = totals(), last = getLast(), cont = "";
+    if (last && find(last.sid) && find(last.sid).modules[last.ci]) {
+      var ls = find(last.sid), lc = cls(ls.id, last.ci);
+      cont = '<section class="continue" style="--c:' + ls.color + '"><span class="cont-ico">' + ico(ls, 26) + '</span><div class="cont-txt"><small>Continue where you stopped</small><b>' + esc(ls.title) + " · Class " + (last.ci + 1) + ": " + esc(ls.modules[last.ci].title) + '</b></div><a class="btn" href="#/skill/' + ls.id + "/class/" + last.ci + '">' + (lc.done ? "Review" : "Resume") + "</a></section>";
+    }
+    app.innerHTML = nav("home") +
+      '<main>' +
+      '<section class="hero2"><div class="wrap hero2-in">' +
+        "<div>" + (user ? '<p class="hello">Welcome back, ' + esc(displayName().split(" ")[0]) + "</p>" : '<p class="eyebrow">Free digital skills school</p>') +
+          "<h1>Go from zero to your first gig.</h1>" +
+          '<p class="hero-sub">Interactive classes that teach you step by step, test you as you learn, and end with real projects reviewed by AI. No long videos. No confusion about where to start.</p>' +
+          '<div class="hero-cta"><a class="btn big" href="' + (user || !sb ? "#skills" : "#/login") + '" data-scroll="skills">' + (user ? "Continue learning" : "Start learning free") + '</a><a class="btn soft big" href="#skills" data-scroll="skills">Browse skills</a></div>' +
+          '<dl class="hero-stats"><div><dt>' + T.skills + "</dt><dd>skills</dd></div><div><dt>" + T.classes + "</dt><dd>classes</dd></div><div><dt>" + T.questions + "</dt><dd>questions</dd></div><div><dt>" + T.resources + "+</dt><dd>resources</dd></div></dl>" +
+        "</div>" +
+        '<div class="preview" aria-hidden="true"><div class="pv-top"><span class="pv-bar"><i></i></span><span class="pv-streak">🔥 3 ×1.5</span><span class="pts-pill"><span class="coin"></span>42</span></div>' +
+          '<p class="pv-k">Question 2 of 3</p><p class="pv-q">Which layer sits between the content and the border?</p>' +
+          '<div class="pv-o">A&nbsp;&nbsp;Margin</div><div class="pv-o right">B&nbsp;&nbsp;Padding<span>+15</span></div><div class="pv-o">C&nbsp;&nbsp;Outline</div>' +
+          '<div class="pv-f"><b>Correct!</b> Padding is the space inside the border.</div></div>' +
+      "</div></section>" +
+      '<div class="wrap">' + cont +
+        '<section class="section" id="skills"><div class="sec-head"><div><h2>Choose a skill</h2><p class="sec-sub">Every skill is free and starts from the very beginning.</p></div>' +
+          '<label class="search">' + svg("search", 18) + '<input type="search" id="q" placeholder="Search skills" aria-label="Search skills"></label></div>' +
+          '<div class="courses" id="courses">' + SKILLS.map(courseCard).join("") + '</div><p class="empty-note" id="none" hidden>No skill matches that search.</p></section>' +
+        '<section class="section finder"><div><h2>Not sure which one fits you?</h2><p class="sec-sub">Tap what sounds most like you.</p></div>' +
+          '<div class="chips2">' + MATCH.map(function (m, k) { return '<button type="button" data-match="' + k + '" aria-pressed="false">' + esc(m[0]) + "</button>"; }).join("") + '</div><div id="match-out"></div></section>' +
+        '<section class="section"><h2>How it works</h2><ol class="steps">' +
+          [["Pick a skill", "Choose from 8 in-demand digital skills. Each one has 4 classes that build on each other."],
+           ["Learn in short steps", "Read a little, see a diagram, then answer a question. You’re never just scrolling."],
+           ["Build your score", "Earn points for every right answer. Answer streaks multiply your points."],
+           ["Ship a real project", "Each class ends with a project. Upload it and the AI reviewer tells you what’s good and what to fix."]]
+            .map(function (x, i) { return '<li><span class="step-n">' + (i + 1) + "</span><h3>" + x[0] + "</h3><p>" + x[1] + "</p></li>"; }).join("") + "</ol></section>" +
+        '<section class="section"><h2>Everything you need to get started</h2><div class="features">' +
+          [["learn", "Interactive classes", "Lessons, tappable diagrams and questions in one smooth flow."],
+           ["board", "Leaderboard", "See how your points compare with other learners."],
+           ["check", "Certificates", "Finish all the classes in a skill and download your certificate."],
+           ["ai-automation", "AI project reviews", "Instant, specific feedback on the work you build."],
+           ["data-analysis", "Progress tracking", "Your points, streaks and classes follow you on any device."],
+           ["content-writing", "Resource library", T.resources + "+ extra courses, templates and tools, sorted by skill."]]
+            .map(function (x) { return '<div class="feature"><span class="f-ico">' + svg(x[0], 22) + "</span><h3>" + x[1] + "</h3><p>" + x[2] + "</p></div>"; }).join("") + "</div></section>" +
+        '<section class="section faq"><h2>Questions people ask</h2>' +
+          [["Is Zero2Gig really free?", "Yes. All 8 skills, every class and the AI project reviews are free."],
+           ["I’ve never done anything digital before. Can I start?", "Yes. Every skill starts from zero and explains things in plain language."],
+           ["How long does a class take?", "About 15 to 20 minutes for the lesson and questions. The project at the end takes longer, because you build something real."],
+           ["Do I get a certificate?", "Yes. When you finish all 4 classes in a skill, you can download a certificate with your name on it."],
+           ["Can I learn on my phone?", "Yes. The whole site is built for phones first, and your progress syncs to your Google account."]]
+            .map(function (x) { return "<details><summary>" + x[0] + "</summary><p>" + x[1] + "</p></details>"; }).join("") + "</section>" +
+        '<section class="cta-band"><h2>Your first class is 15 minutes away.</h2><p>Pick a skill and start now. It’s free.</p><a class="btn big light" href="' + (user || !sb ? "#skills" : "#/login") + '" data-scroll="skills">' + (user ? "Pick a skill" : "Start learning free") + "</a></section>" +
+      "</div>" + footer() + "</main>";
 
+    app.querySelectorAll("[data-scroll]").forEach(function (a) {
+      if (a.getAttribute("href").charAt(1) === "/") return;
+      a.addEventListener("click", function (e) { e.preventDefault(); document.getElementById(a.dataset.scroll).scrollIntoView({ behavior: "smooth" }); });
+    });
+    var q = document.getElementById("q");
+    q.addEventListener("input", function () {
+      var v = q.value.trim().toLowerCase(), shown = 0;
+      app.querySelectorAll(".course").forEach(function (c) { var ok = c.dataset.search.indexOf(v) !== -1; c.hidden = !ok; if (ok) shown++; });
+      document.getElementById("none").hidden = shown > 0;
+    });
     app.querySelectorAll("[data-match]").forEach(function (b) {
       b.addEventListener("click", function () {
         app.querySelectorAll("[data-match]").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
         b.setAttribute("aria-pressed", "true");
         var s = find(MATCH[+b.dataset.match][1]);
-        app.querySelectorAll(".skill-card").forEach(function (c) { c.classList.remove("is-match"); });
-        document.getElementById("card-" + s.id).classList.add("is-match");
         document.getElementById("match-out").innerHTML =
-          '<div class="match-result" style="--c:' + s.color + '"><span class="ico">' + s.icon + "</span><div>Try <strong>" + esc(s.title) + "</strong>.<br>" +
-          '<a href="#/skill/' + s.id + '">See the classes</a></div></div>';
+          '<a class="match-result" href="#/skill/' + s.id + '" style="--c:' + s.color + '"><span class="cont-ico">' + ico(s, 26) + "</span><div><small>We’d start with</small><b>" + esc(s.title) + '</b></div><span class="go">See the classes →</span></a>';
       });
     });
   }
@@ -168,37 +250,47 @@
   // ---------- skill page ----------
   function skillPage(s, tab) {
     setTitle(s.title);
-    var k = skillStats(s);
-    var resCount = (s.resources || []).length;
+    var k = skillStats(s), resCount = (s.resources || []).length;
+    var q = s.modules.reduce(function (a, m) { return a + m.questions.length; }, 0);
+    var nx = nextClass(s), started = k.done > 0 || cls(s.id, 0).step > 0, complete = isComplete(s);
+    var learn = []; s.modules.forEach(function (m) { learn.push(m.keyPoints[0], m.keyPoints[1]); });
+
     var classesHTML = '<div class="classes">' + s.modules.map(function (m, i) {
       var c = cls(s.id, i);
-      var answered = Object.keys(c.answers).length, total = m.questions.length;
-      var status = c.done ? '<span class="ok">✓ Finished</span>' : answered ? "In progress" : "Not started";
-      var review = c.review ? (c.review.passed ? '<span class="ok">Project passed</span>' : "Project: try again") : "";
+      var status = c.done ? '<span class="ok">Finished</span>' : c.step > 0 ? "In progress" : "Not started";
+      var review = c.review ? (c.review.passed ? '<span class="ok">Project passed</span>' : "Project needs another try") : "";
       var label = c.done ? "Review" : c.step > 0 ? "Continue" : "Start";
-      return '<article class="class-card' + (c.done ? " done" : "") + '" style="--c:' + s.color + '">' +
-        '<div class="class-num">' + (c.done ? "✓" : i + 1) + "</div>" +
-        "<div><h3>Class " + (i + 1) + ": " + esc(m.title) + "</h3><p>" + esc(m.summary) + "</p>" +
-        '<div class="class-meta"><span>' + status + "</span><span>" + total + " questions</span><span>" + totalPts(c) + " pts</span>" + (review ? "<span>" + review + "</span>" : "") + "</div></div>" +
-        '<a class="btn" href="#/skill/' + s.id + "/class/" + i + '">' + label + "</a></article>";
+      return '<article class="class-card' + (c.done ? " done" : "") + '">' +
+        '<div class="class-num">' + (c.done ? svg("check", 24) : i + 1) + "</div>" +
+        "<div><h3>" + esc(m.title) + "</h3><p>" + esc(m.summary) + "</p>" +
+        '<div class="class-meta"><span>' + status + "</span><span>" + m.lesson.length + " lessons</span><span>" + m.questions.length + " questions</span><span>1 project</span>" + (totalPts(c) ? "<span>" + totalPts(c) + " pts</span>" : "") + (review ? "<span>" + review + "</span>" : "") + "</div></div>" +
+        '<a class="btn' + (c.done ? " soft" : "") + '" href="#/skill/' + s.id + "/class/" + i + '">' + label + "</a></article>";
     }).join("") + "</div>";
 
     function resRow(r) {
       var host = /mega\.nz/.test(r.url) ? "MEGA" : /docs\.google/.test(r.url) ? "Google Doc" : /drive\.google/.test(r.url) ? "Google Drive" : "Link";
-      return '<a class="res" href="' + esc(r.url) + '" target="_blank" rel="noopener"><span class="ri">📁</span><span>' + esc(r.title) + "</span><small>" + host + " ↗</small></a>";
+      return '<a class="res" href="' + esc(r.url) + '" target="_blank" rel="noopener"><span class="ri">' + svg("learn", 18) + "</span><span>" + esc(r.title) + "</span><small>" + host + " ↗</small></a>";
     }
     var resHTML = '<div class="res-list">' + (resCount ? s.resources.map(resRow).join("") : '<p class="empty-note">No extra resources yet.</p>') + "</div>" +
       '<h2 class="res-h">Start earning with your skill</h2><div class="res-list">' + FREELANCE.map(resRow).join("") + "</div>";
 
-    app.innerHTML = nav() + '<main class="wrap" style="--c:' + s.color + '">' +
-      '<a class="back" href="#/">← All skills</a>' +
-      '<section class="skill-hero"><div class="ico">' + s.icon + "</div><h1>" + esc(s.title) + "</h1><p>" + esc(s.intro) + "</p>" +
-        '<div class="chips"><span class="chip">' + s.modules.length + " classes</span><span class=\"chip\">" + esc(s.duration) + '</span><span class="chip">' + k.pts + ' pts earned</span><span class="chip">' + resCount + " resources</span></div></section>" +
-      '<div class="tabs" role="tablist">' +
-        '<button role="tab" aria-selected="' + (tab === "classes") + '" data-tab="classes">Classes</button>' +
-        '<button role="tab" aria-selected="' + (tab === "res") + '" data-tab="res">Resource library</button></div>' +
-      '<div id="tabpanel">' + (tab === "res" ? resHTML : classesHTML) + "</div>" +
-      '<div style="height:3rem"></div></main>';
+    app.innerHTML = nav("home") + '<main style="--c:' + s.color + '">' +
+      '<section class="c-hero"><div class="wrap c-hero-in"><div>' +
+        '<nav class="crumbs2"><a href="#/">Skills</a> / <span>' + esc(s.title) + "</span></nav>" +
+        "<h1>" + esc(s.title) + '</h1><p class="c-sub">' + esc(s.intro) + "</p>" +
+        '<div class="c-meta"><span class="badge solid">Beginner</span><span>' + s.modules.length + " classes</span><span>" + q + " questions</span><span>" + esc(s.duration) + "</span><span>Certificate</span></div>" +
+      "</div>" +
+      '<aside class="enroll"><div class="cover"><span class="cover-ico">' + ico(s, 48) + "</span></div><div class=\"enroll-b\">" +
+        (started ? '<div class="meter"><i style="width:' + k.pct + '%"></i></div><p class="enroll-p">' + k.done + " of " + s.modules.length + " classes · " + k.pts + " pts</p>" : '<p class="enroll-free">Free</p>') +
+        (complete ? '<a class="btn big" href="#/certificate/' + s.id + '">Get your certificate</a>' : '<a class="btn big" href="#/skill/' + s.id + "/class/" + nx + '">' + (started ? "Continue class " + (nx + 1) : "Start learning") + "</a>") +
+        '<ul class="incl"><li>' + svg("check", 18) + s.modules.length + " interactive classes</li><li>" + svg("check", 18) + q + " questions with instant feedback</li><li>" + svg("check", 18) + s.modules.length + " AI-reviewed projects</li><li>" + svg("check", 18) + resCount + " extra resources</li><li>" + svg("check", 18) + "Certificate of completion</li></ul>" +
+      "</div></aside></div></section>" +
+      '<div class="wrap c-body"><div class="c-main">' +
+        '<section class="learn-box"><h2>What you’ll learn</h2><ul>' + learn.map(function (x) { return "<li>" + svg("check", 18) + "<span>" + esc(x) + "</span></li>"; }).join("") + "</ul></section>" +
+        '<div class="tabs" role="tablist"><button role="tab" aria-selected="' + (tab === "classes") + '" data-tab="classes">Classes</button><button role="tab" aria-selected="' + (tab === "res") + '" data-tab="res">Resource library (' + resCount + ")</button></div>" +
+        '<div id="tabpanel">' + (tab === "res" ? resHTML : classesHTML) + "</div>" +
+        '<section class="outcome"><h2>You’ll finish with</h2><p>' + esc(s.outcome) + ".</p></section>" +
+      "</div></div>" + footer() + "</main>";
 
     app.querySelectorAll("[data-tab]").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -207,6 +299,70 @@
         document.getElementById("tabpanel").innerHTML = b.dataset.tab === "res" ? resHTML : classesHTML;
       });
     });
+  }
+
+  // ---------- my learning ----------
+  function learnPage() {
+    setTitle("My learning");
+    var st = allStats();
+    var active = SKILLS.filter(function (s) { var k = skillStats(s); return k.done > 0 || k.pts > 0 || cls(s.id, 0).step > 0; });
+    var done = SKILLS.filter(isComplete);
+    var rows = active.map(function (s) {
+      var k = skillStats(s), nx = nextClass(s), comp = isComplete(s);
+      return '<article class="my-row" style="--c:' + s.color + '"><span class="cont-ico">' + ico(s, 26) + '</span><div class="my-mid"><h3>' + esc(s.title) + '</h3><div class="meter"><i style="width:' + k.pct + '%"></i></div><p>' + k.done + " of " + s.modules.length + " classes · " + k.pts + " pts</p></div>" +
+        (comp ? '<a class="btn" href="#/certificate/' + s.id + '">Certificate</a>' : '<a class="btn" href="#/skill/' + s.id + "/class/" + nx + '">Continue</a>') + "</article>";
+    }).join("");
+    app.innerHTML = nav("learn") + '<main class="wrap page">' +
+      "<h1>My learning</h1>" +
+      '<section class="stats"><div class="stat"><b>' + st.pts + "</b><span>Total points</span></div><div class=\"stat\"><b>" + st.done + "</b><span>Classes finished</span></div><div class=\"stat\"><b>" + done.length + "</b><span>Certificates</span></div></section>" +
+      (active.length ? '<h2 class="sub-h">In progress</h2><div class="my-list">' + rows + "</div>"
+        : '<div class="empty"><h2>You haven’t started a skill yet</h2><p>Pick one and take your first class. It takes about 15 minutes.</p><a class="btn big" href="#/">Browse skills</a></div>') +
+      (active.length < SKILLS.length ? '<h2 class="sub-h">Try next</h2><div class="courses">' + SKILLS.filter(function (s) { return active.indexOf(s) === -1; }).slice(0, 4).map(courseCard).join("") + "</div>" : "") +
+      "</main>" + footer();
+  }
+
+  // ---------- leaderboard ----------
+  function leaderboardPage() {
+    setTitle("Leaderboard");
+    app.innerHTML = nav("board") + '<main class="wrap page"><h1>Leaderboard</h1><p class="sec-sub">The top learners on ' + esc(SITE.name) + ' by total points.</p><div id="lb"><p class="msg"><span class="loader"></span> Loading…</p></div></main>' + footer();
+    var out = document.getElementById("lb");
+    if (!sb) { out.innerHTML = '<p class="msg">The leaderboard appears once accounts are connected.</p>'; return; }
+    if (!user) { out.innerHTML = '<div class="empty"><h2>Log in to see the leaderboard</h2><p>Sign in with Google to see where you rank.</p><a class="btn big" href="#/login">Log in</a></div>'; return; }
+    pushProgress().then(function () { return sb.rpc("leaderboard"); }).then(function (r) {
+      if (r.error) throw r.error;
+      var rows = r.data || [];
+      if (!rows.length) { out.innerHTML = '<div class="empty"><h2>No points yet</h2><p>Be the first on the board. Finish a class to earn points.</p><a class="btn big" href="#/">Start a class</a></div>'; return; }
+      out.innerHTML = '<ol class="lb">' + rows.map(function (x, i) {
+        return '<li class="' + (x.is_me ? "me" : "") + '"><span class="rank r' + (i + 1) + '">' + (i + 1) + '</span><span class="lb-name">' + esc(x.name || "Learner") + (x.is_me ? " (you)" : "") + '</span><span class="lb-c">' + x.classes_done + ' classes</span><span class="pts-pill"><span class="coin"></span>' + x.total_points + "</span></li>";
+      }).join("") + "</ol>";
+    }).catch(function (e) { console.error(e); out.innerHTML = '<p class="msg warn">The leaderboard couldn’t load. Please try again.</p>'; });
+  }
+
+  // ---------- certificate ----------
+  function certificatePage(s) {
+    setTitle("Certificate: " + s.title);
+    if (!isComplete(s)) {
+      var k = skillStats(s);
+      app.innerHTML = nav() + '<main class="wrap page"><div class="empty"><h2>Finish all ' + s.modules.length + " classes to unlock this certificate</h2><p>You’ve finished " + k.done + " of " + s.modules.length + " classes in " + esc(s.title) + '.</p><a class="btn big" href="#/skill/' + s.id + "/class/" + nextClass(s) + '">Continue learning</a></div></main>' + footer();
+      return;
+    }
+    var k2 = skillStats(s), latest = 0, passed = 0;
+    s.modules.forEach(function (_, i) { var c = cls(s.id, i); if (c.doneAt) latest = Math.max(latest, Date.parse(c.doneAt)); if (c.review && c.review.passed) passed++; });
+    var date = new Date(latest || Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    var name = user ? displayName() : "Zero2Gig Learner";
+    var id = "Z2G-" + s.id.replace(/[^a-z]/g, "").slice(0, 3).toUpperCase() + "-" + (user ? user.id.slice(0, 8).toUpperCase() : "LOCAL");
+    app.innerHTML = nav() + '<main class="wrap page cert-page" style="--c:' + s.color + '">' +
+      '<div class="cert-actions"><a class="back" href="#/skill/' + s.id + '">← Back to ' + esc(s.title) + '</a><button class="btn" id="print" type="button">Download / Print</button></div>' +
+      '<section class="cert" id="cert"><div class="cert-in">' +
+        '<div class="cert-brand"><span class="logo-mark">' + LOGO_SVG + "</span>" + esc(SITE.name) + "</div>" +
+        '<p class="cert-k">Certificate of Completion</p><p class="cert-t">This certifies that</p>' +
+        '<p class="cert-name">' + esc(name) + "</p>" +
+        '<p class="cert-t">has completed all ' + s.modules.length + " classes in</p>" +
+        '<p class="cert-skill">' + esc(s.title) + "</p>" +
+        '<div class="cert-foot"><div><b>' + date + "</b><span>Date</span></div><div><b>" + k2.pts + " pts</b><span>Score</span></div><div><b>" + passed + " of " + s.modules.length + "</b><span>Projects passed</span></div><div><b>" + id + "</b><span>Certificate ID</span></div></div>" +
+      "</div></section>" +
+      '<p class="sec-sub" style="text-align:center">Tip: choose “Save as PDF” in the print window to keep a copy, then share it on LinkedIn.</p></main>';
+    document.getElementById("print").addEventListener("click", function () { window.print(); });
   }
 
   // ---------- diagrams ----------
@@ -274,6 +430,7 @@
     setTitle("Class " + (ci + 1) + ": " + m.title);
     var steps = buildSteps(m);
     var c = cls(s.id, ci);
+    try { localStorage.setItem("z2g-last", JSON.stringify({ sid: s.id, ci: ci })); } catch (e) {}
     if (c.step >= steps.length) c.step = steps.length - 1;
 
     app.innerHTML =
@@ -314,7 +471,7 @@
       nextBtn.textContent = st.t === "intro" ? "Start class" : "Continue";
       var h = "";
       if (st.t === "intro") {
-        h = '<p class="kicker">' + s.icon + " " + esc(s.title) + " · Class " + (ci + 1) + " of " + s.modules.length + "</p>" +
+        h = '<p class="kicker">' + ico(s, 26) + " " + esc(s.title) + " · Class " + (ci + 1) + " of " + s.modules.length + "</p>" +
           "<h1>" + esc(m.title) + '</h1><p class="lead">' + esc(m.summary) + "</p>" +
           '<div class="intro-card"><strong>By the end of this class you’ll know:</strong><ul>' + m.keyPoints.map(function (k) { return "<li>" + esc(k) + "</li>"; }).join("") + "</ul></div>" +
           '<div class="scoring"><div><b>+' + FIRST_TRY + "</b>first try</div><div><b>×2</b>streak bonus</div><div><b>+" + PASS_BONUS + "</b>project passed</div></div>";
@@ -327,7 +484,7 @@
       } else if (st.t === "recap") {
         h = '<p class="kicker">✅ Recap</p><h1>Remember this</h1><div class="recap">' + m.keyPoints.map(function (k) { return '<div><span class="tick">✓</span><span>' + esc(k) + "</span></div>"; }).join("") + "</div>";
       } else if (st.t === "finish") {
-        if (!c.done) { c.done = true; persist(); }
+        if (!c.done) { c.done = true; c.doneAt = new Date().toISOString(); persist(); }
         h = finishHTML();
       }
       stage.innerHTML = '<div class="step">' + h + "</div>";
@@ -403,7 +560,7 @@
           '<div><button class="btn big" type="submit">Send for AI review</button></div>' +
         '</form><div id="out" aria-live="polite">' + (c.review ? reviewHTML(c.review) : "") + "</div></section>" +
         '<div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.4rem">' +
-          (last ? '<a class="btn soft big" href="#/skill/' + s.id + '">Back to all classes</a>' : '<a class="btn big" href="#/skill/' + s.id + "/class/" + (ci + 1) + '">Next class →</a><a class="btn soft big" href="#/skill/' + s.id + '">All classes</a>') +
+          (isComplete(s) ? '<a class="btn big" href="#/certificate/' + s.id + '">🎓 Get your certificate</a>' : "") + (last ? '<a class="btn soft big" href="#/skill/' + s.id + '">Back to all classes</a>' : '<a class="btn big" href="#/skill/' + s.id + "/class/" + (ci + 1) + '">Next class →</a><a class="btn soft big" href="#/skill/' + s.id + '">All classes</a>') +
         "</div>";
     }
     function reviewHTML(r) {
