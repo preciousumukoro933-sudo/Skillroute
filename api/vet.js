@@ -1,7 +1,10 @@
 // AI assignment reviewer for Vercel. Keeps the API key secret on the server.
-// Set ANTHROPIC_API_KEY in Vercel: Project > Settings > Environment Variables.
-// Optional: ANTHROPIC_MODEL to change the model.
+// Set ONE of these in Vercel: Project > Settings > Environment Variables.
+//   GROQ_API_KEY       uses Groq (optional GROQ_MODEL)
+//   ANTHROPIC_API_KEY  uses Claude (optional ANTHROPIC_MODEL)
+// If both are set, Groq is used.
 
+const GROQ_MODEL = process.env.GROQ_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 
 const SYSTEM = `You review assignments for beginners on a learning platform that teaches digital skills from zero.
@@ -64,8 +67,9 @@ function parseJSON(text) {
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
 
+  const groqKey = process.env.GROQ_API_KEY;
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return res.status(500).json({ error: "The AI reviewer isn’t set up yet. Add ANTHROPIC_API_KEY in your Vercel environment variables, then redeploy." });
+  if (!groqKey && !key) return res.status(500).json({ error: "The AI reviewer isn’t set up yet. Add GROQ_API_KEY in your Vercel environment variables, then redeploy." });
 
   let b = req.body;
   if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = null; } }
@@ -76,12 +80,8 @@ module.exports = async (req, res) => {
 
   const linkText = link ? await fetchPage(link) : "";
 
-  const content = [];
-  if (file && file.kind === "image" && /^image\/(png|jpeg|gif|webp)$/.test(file.type) && file.data) {
-    content.push({ type: "image", source: { type: "base64", media_type: file.type, data: file.data } });
-  } else if (file && file.kind === "pdf" && file.data) {
-    content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: file.data } });
-  }
+  const isImage = file && file.kind === "image" && /^image\/(png|jpeg|gif|webp)$/.test(file.type) && file.data;
+  const isPdf = file && file.kind === "pdf" && file.data;
 
   const parts = [
     `Skill: ${skill}`,
@@ -94,30 +94,57 @@ module.exports = async (req, res) => {
     link ? `Link submitted: ${link}` : "No link submitted.",
     linkText ? `Text found at the link (may be partial):\n${linkText}` : "",
     file && file.kind === "text" ? `Uploaded file "${file.name}":\n${String(file.data).slice(0, 15000)}` : "",
-    file && file.kind !== "text" ? `An uploaded ${file.kind} named "${file.name}" is attached above.` : "",
+    isImage ? `An uploaded image named "${file.name}" is attached.` : "",
+    isPdf && !groqKey ? `An uploaded PDF named "${file.name}" is attached.` : "",
+    isPdf && groqKey ? `The learner uploaded a PDF named "${file.name}", but it could not be read. Judge from the other evidence, and if that is not enough, ask them to upload screenshots or share a link.` : "",
     "---- END OF SUBMISSION ----",
     "Review it now and reply with the JSON object only."
   ].filter(Boolean);
-  content.push({ type: "text", text: parts.join("\n\n") });
+  const promptText = parts.join("\n\n");
 
-  let r;
+  let text = "";
   try {
-    r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1200, system: SYSTEM, messages: [{ role: "user", content }] })
-    });
+    if (groqKey) {
+      const userContent = [{ type: "text", text: promptText }];
+      if (isImage) userContent.push({ type: "image_url", image_url: { url: `data:${file.type};base64,${file.data}` } });
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${groqKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          temperature: 0.2,
+          max_completion_tokens: 1200,
+          response_format: { type: "json_object" },
+          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: userContent }]
+        })
+      });
+      if (!r.ok) {
+        console.error("Groq API error", r.status, await r.text());
+        return res.status(502).json({ error: `The AI reviewer returned an error (${r.status}). Check GROQ_API_KEY and GROQ_MODEL in Vercel.` });
+      }
+      const data = await r.json();
+      text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+    } else {
+      const content = [];
+      if (isImage) content.push({ type: "image", source: { type: "base64", media_type: file.type, data: file.data } });
+      else if (isPdf) content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: file.data } });
+      content.push({ type: "text", text: promptText });
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: MODEL, max_tokens: 1200, system: SYSTEM, messages: [{ role: "user", content }] })
+      });
+      if (!r.ok) {
+        console.error("Anthropic API error", r.status, await r.text());
+        return res.status(502).json({ error: `The AI reviewer returned an error (${r.status}). Check the API key and model name in Vercel.` });
+      }
+      const data = await r.json();
+      text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("");
+    }
   } catch (e) {
     return res.status(502).json({ error: "The AI reviewer couldn’t be reached. Please try again in a minute." });
   }
 
-  if (!r.ok) {
-    console.error("Anthropic API error", r.status, await r.text());
-    return res.status(502).json({ error: `The AI reviewer returned an error (${r.status}). Check the API key and model name in Vercel.` });
-  }
-
-  const data = await r.json();
-  const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("");
   const parsed = parseJSON(text);
   if (!parsed) return res.status(502).json({ error: "The reviewer’s answer couldn’t be read. Please submit again." });
 

@@ -31,5 +31,5 @@ To embed a specific YouTube video, add `videoId: "abc123XYZ"` inside that module
 
 1. In Vercel: Add New > Project > import this GitHub repo.
 2. Framework preset: Other. Leave build command and output directory empty.
-3. Under Environment Variables, add `ANTHROPIC_API_KEY`.
+3. Under Environment Variables, add `GROQ_API_KEY` (or `ANTHROPIC_API_KEY` to use Claude).
 4. Deploy. The reviewer runs from `api/vet.js` at `/api/vet`.
