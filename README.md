@@ -26,3 +26,10 @@ To embed a specific YouTube video, add `videoId: "abc123XYZ"` inside that module
 
 - Progress is saved in each learner's browser (localStorage). For accounts and saved progress across devices, add Supabase auth later.
 - The reviewer accepts images, PDFs, code/text files, links and written explanations. For big projects, learners should share a GitHub link.
+
+## Deploy on Vercel
+
+1. In Vercel: Add New > Project > import this GitHub repo.
+2. Framework preset: Other. Leave build command and output directory empty.
+3. Under Environment Variables, add `ANTHROPIC_API_KEY`.
+4. Deploy. The reviewer runs from `api/vet.js` at `/api/vet`.

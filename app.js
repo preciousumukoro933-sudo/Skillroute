@@ -122,7 +122,7 @@
           "<h3>What the reviewer checks</h3>" + list(m.assignment.criteria) +
           '<form id="submit-form" novalidate>' +
             '<label>Link to your work <span class="hint">GitHub repo, live site, Google Drive, Canva or Notion share link</span><input type="url" name="link" placeholder="https://"></label>' +
-            '<label>Upload a file <span class="hint">Screenshot, PDF, or a code/text file. Images and PDFs up to 3.5 MB.</span><input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.txt,.md,.html,.css,.js,.ts,.py,.sql,.json,.csv,.java,.php"></label>' +
+            '<label>Upload a file <span class="hint">Screenshot, PDF, or a code/text file. Images and PDFs up to 3 MB.</span><input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.txt,.md,.html,.css,.js,.ts,.py,.sql,.json,.csv,.java,.php"></label>' +
             '<label>Explain what you built <span class="hint">What you made, how you made it, and anything you got stuck on</span><textarea name="notes"></textarea></label>' +
             '<div><button class="btn" type="submit">Send for review</button></div>' +
           "</form>" +
@@ -176,7 +176,7 @@
       const fr = new FileReader();
       fr.onerror = () => reject(new Error("That file couldn’t be read. Try another one."));
       if (isImg || isPdf) {
-        if (file.size > 3.5 * 1024 * 1024) return reject(new Error("That file is over 3.5 MB. Upload a smaller screenshot, or share a link instead."));
+        if (file.size > 3 * 1024 * 1024) return reject(new Error("That file is over 3 MB. Upload a smaller screenshot, or share a link instead."));
         fr.onload = () => resolve({ name: file.name, type: file.type, kind: isImg ? "image" : "pdf", data: String(fr.result).split(",")[1] });
         fr.readAsDataURL(file);
       } else if (file.size <= 400 * 1024) {
@@ -239,7 +239,7 @@
         save(p);
         out.innerHTML = resultHTML(rec);
       } catch (err) {
-        const local = location.protocol === "file:" ? " The reviewer only works once the site is deployed on Netlify." : "";
+        const local = location.protocol === "file:" ? " The reviewer only works once the site is deployed online." : "";
         out.innerHTML = '<p class="msg warn">' + esc(err.message) + local + "</p>";
       } finally {
         btn.disabled = false;

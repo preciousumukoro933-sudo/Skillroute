@@ -1,0 +1,5 @@
+{
+  "functions": {
+    "api/vet.js": { "maxDuration": 60 }
+  }
+}
