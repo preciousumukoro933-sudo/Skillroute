@@ -685,6 +685,13 @@
             return '<div class="bar-col" title="' + fmtDay(x.day) + ": " + x.signups + " joined, " + x.active + ' learning"><div class="bar-pair"><i class="l1" style="height:' + (x.signups / max * 100) + '%"></i><i class="l2" style="height:' + (x.active / max * 100) + '%"></i></div><span>' + new Date(x.day + "T12:00:00").getDate() + "</span></div>";
           }).join("") + "</div>" +
           '<details class="tbl-alt"><summary>Show the numbers</summary><table class="tbl"><thead><tr><th>Day</th><th>Joined</th><th>Learning</th></tr></thead><tbody>' + daily.slice().reverse().map(function (x) { return "<tr><td>" + fmtDay(x.day) + "</td><td>" + x.signups + "</td><td>" + x.active + "</td></tr>"; }).join("") + "</tbody></table></details></section>" +
+        '<section class="panel compose"><div class="panel-h"><div><h2>Email your learners</h2><p class="sec-sub">One message, sent to everyone at once. Each email starts with the learner’s first name.</p></div><span class="auto-pill">Automatic reminders: daily at 6 pm</span></div>' +
+          '<form class="form" id="mail-form" novalidate>' +
+            '<label>Send to<select name="audience"><option value="all">All learners</option><option value="inactive">Learners who haven’t learned in 2+ days</option></select></label>' +
+            '<label>Subject<input name="subject" maxlength="150" placeholder="New class just dropped"></label>' +
+            '<label>Message <span class="hint">Don’t type “Hi name”. That’s added for you, along with a button to open the site.</span><textarea name="message" maxlength="5000" placeholder="Write your message here…"></textarea></label>' +
+            '<div><button class="btn big" type="submit">Send email</button></div>' +
+          '</form><div id="mail-out" aria-live="polite"></div></section>' +
         '<section class="panel"><div class="panel-h"><div><h2>Needs a reminder (' + cold.length + ')</h2><p class="sec-sub">Learners who haven’t taken a class in 2 or more days.</p></div>' +
           (cold.length ? '<div class="panel-a"><button class="btn soft" id="copy-cold" type="button">Copy emails</button><a class="btn" id="mail-cold" href="#">Email them</a></div>' : "") + "</div>" +
           (cold.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Learner</th><th>Points</th><th>Classes</th><th>Days learned</th><th>Joined</th><th>Last learned</th></tr></thead><tbody>' + rowsHTML(cold.slice(0, 50)) + "</tbody></table></div>" + (cold.length > 50 ? '<p class="sec-sub">Showing the first 50. “Copy emails” copies all ' + cold.length + ".</p>" : "") : '<p class="msg">Everyone has learned in the last 2 days. 🎉</p>') + "</section>" +
@@ -699,6 +706,30 @@
         });
         document.getElementById("mail-cold").href = "mailto:?bcc=" + encodeURIComponent(cold.slice(0, 40).map(function (x) { return x.email; }).filter(Boolean).join(",")) + "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
       }
+      var mf = document.getElementById("mail-form"), mo = document.getElementById("mail-out");
+      mf.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var payload = { audience: mf.audience.value, subject: mf.subject.value.trim(), message: mf.message.value.trim() };
+        if (!payload.subject || !payload.message) { mo.innerHTML = '<p class="msg warn">Add a subject and a message first.</p>'; return; }
+        var btn = mf.querySelector("button[type=submit]");
+        function call(extra) {
+          return sb.auth.getSession().then(function (r) {
+            return fetch("/api/broadcast", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (r.data.session && r.data.session.access_token) }, body: JSON.stringify(Object.assign({}, payload, extra)) });
+          }).then(function (res) { return res.json().catch(function () { return { error: "The email service sent back something unexpected." }; }).then(function (j) { if (!res.ok || j.error) throw new Error(j.error || "Sending failed."); return j; }); });
+        }
+        btn.disabled = true; btn.innerHTML = '<span class="loader"></span> Checking…';
+        call({ preview: true }).then(function (pv) {
+          if (!pv.count) { mo.innerHTML = '<p class="msg">Nobody matches that group right now, so nothing was sent.</p>'; return; }
+          if (!pv.ready) { mo.innerHTML = '<p class="msg warn">Email isn’t connected yet. Add BREVO_API_KEY and SENDER_EMAIL in Vercel, then redeploy.</p>'; return; }
+          if (!window.confirm("Send “" + payload.subject + "” to " + pv.count + " learner" + (pv.count === 1 ? "" : "s") + "?")) return;
+          btn.innerHTML = '<span class="loader"></span> Sending…';
+          return call({}).then(function (j) {
+            mo.innerHTML = '<p class="msg">✅ Sent to ' + j.sent + " learner" + (j.sent === 1 ? "" : "s") + (j.failed ? ". " + j.failed + " could not be delivered." : ".") + "</p>";
+            if (!j.failed) { mf.subject.value = ""; mf.message.value = ""; }
+          });
+        }).catch(function (err) { mo.innerHTML = '<p class="msg warn">' + esc(err.message) + "</p>"; })
+          .then(function () { btn.disabled = false; btn.textContent = "Send email"; });
+      });
       document.getElementById("adm-q").addEventListener("input", function (e) {
         var v = e.target.value.trim().toLowerCase();
         document.getElementById("adm-rows").innerHTML = rowsHTML(list.filter(function (x) { return ((x.name || "") + " " + (x.email || "")).toLowerCase().indexOf(v) !== -1; }));
@@ -831,7 +862,18 @@
     app.innerHTML = authShell('<div class="auth-card"><div class="avatar big">' + avatarHTML("av-img") + "</div><h1>" + esc(displayName()) + '</h1><p class="sub">' + esc(user.email) + "</p>" +
       '<div class="result-grid"><div><b>' + st.pts + "</b><span>points</span></div><div><b>" + st.done + "</b><span>classes done</span></div><div><b>" + st.best + "</b><span>best streak</span></div></div>" +
       '<p class="sub" style="margin-top:1.2rem">Your progress is saved to your account, so you can continue on any device.</p>' +
+      '<label class="switch"><input type="checkbox" id="rem" checked disabled><span>Email me reminders and updates</span></label>' +
       '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1rem"><a class="btn" href="#/">Keep learning</a><a class="btn soft" id="admin-link" href="#/admin" hidden>Admin dashboard</a><button class="btn soft" id="logout" type="button">Log out</button></div></div>');
+    var rem = document.getElementById("rem");
+    sb.from("profiles").select("reminders_on").eq("id", user.id).maybeSingle().then(function (r) {
+      if (r.data) rem.checked = r.data.reminders_on !== false;
+      rem.disabled = false;
+    });
+    rem.addEventListener("change", function () {
+      sb.from("profiles").update({ reminders_on: rem.checked }).eq("id", user.id).then(function (r) {
+        if (r.error) { rem.checked = !rem.checked; toast("Couldn’t save. Try again."); } else toast(rem.checked ? "Email reminders on" : "Email reminders off");
+      });
+    });
     sb.rpc("is_admin").then(function (r) { var a = document.getElementById("admin-link"); if (a && r.data === true) a.hidden = false; });
     document.getElementById("logout").addEventListener("click", function () {
       pushProgress().then(function () { return sb.auth.signOut(); }).then(function () {

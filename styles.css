@@ -599,3 +599,11 @@ body[data-view="player"] .zee-fab span { display: none; }
   .zee { right: 0; left: 0; bottom: 0; width: 100%; height: min(85dvh, 40rem); border-radius: 22px 22px 0 0; }
 }
 @media print { .zee-fab, .zee { display: none !important; } }
+
+/* ---------- email compose + switch ---------- */
+.compose .form { margin-top: 0; max-width: 40rem; }
+.compose select, .compose input[name=subject] { font: inherit; color: var(--ink); background: var(--bg); border: 2px solid var(--line); border-radius: var(--r-sm); padding: .75rem .9rem; width: 100%; font-weight: 400; }
+.compose select:focus, .compose input:focus { border-color: var(--brand); outline: none; }
+.auto-pill { font-size: .82rem; font-weight: 700; padding: .35rem .8rem; border-radius: 99px; background: var(--good-bg); color: var(--good); white-space: nowrap; }
+.switch { display: flex; align-items: center; gap: .7rem; margin-top: 1.1rem; font-weight: 500; cursor: pointer; }
+.switch input { width: 20px; height: 20px; accent-color: var(--brand); }
