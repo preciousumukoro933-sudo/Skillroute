@@ -148,7 +148,7 @@
             '<div class="meter"><i style="width:' + k.pct + '%"></i></div>' +
             '<div class="card-foot"><span>' + k.done + " of " + s.modules.length + " classes</span><span>" + k.pts + " pts</span></div></a>";
         }).join("") + "</section>" +
-        '<footer class="foot">Your progress is saved in this browser.</footer>' +
+        '<footer class="foot">© 2026 Zero2Gig · <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a></footer>' +
       "</main>";
 
     app.querySelectorAll("[data-match]").forEach(function (b) {
@@ -519,7 +519,7 @@
             '<li><span class="perk-i">🔥</span><div><b>Points and streaks</b><small>Your score follows you on any device</small></div></li>' +
             '<li><span class="perk-i">🤖</span><div><b>AI-reviewed projects</b><small>Build real work and get instant feedback</small></div></li>' +
           "</ul>" +
-          '<p class="fine">New here? This creates your account. Been here before? It signs you back in.</p>' +
+          '<p class="fine">By continuing, you agree to our <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>' +
         "</section>" +
         '<a class="login-back" href="#/">← Browse the skills first</a>' +
       "</div>";
